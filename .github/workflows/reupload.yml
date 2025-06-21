@@ -1,0 +1,49 @@
+name: 🚀 Upload Backup to SFTP (Manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      host:
+        description: "🌐 SFTP Host (e.g. sftp.example.com)"
+        required: true
+      port:
+        description: "📦 SFTP Port (default: 22)"
+        required: false
+        default: "22"
+      username:
+        description: "👤 SFTP Username"
+        required: true
+      password:
+        description: "🔐 SFTP Password"
+        required: true
+
+jobs:
+  upload-to-sftp:
+    runs-on: ubuntu-latest
+    name: 🔄 Upload Files to SFTP Server
+
+    steps:
+      - name: 📦 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🛠️ Install lftp
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lftp
+
+      - name: 🚀 Upload ftp-backup/ to SFTP & Capture Log
+        env:
+          HOST: ${{ github.event.inputs.host }}
+          PORT: ${{ github.event.inputs.port }}
+          USER: ${{ github.event.inputs.username }}
+          PASS: ${{ github.event.inputs.password }}
+        run: |
+          echo "Connecting to $HOST:$PORT"
+          mkdir -p logs
+          lftp -u "$USER","$PASS" -p "$PORT" sftp://"$HOST" -e \
+          "set sftp:connect-program \"ssh -a -x -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null\"; mirror --reverse --verbose ftp-backup /; bye" | tee logs/upload.log
+
+      - name: 📄 Show Uploaded Files Summary
+        run: |
+          echo "📄 Uploaded Files:"
+          grep "^Transferring file" logs/upload.log | sed 's/.*Transferring file //' || echo "⚠️ No files were transferred."
