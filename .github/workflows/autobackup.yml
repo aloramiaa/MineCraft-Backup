@@ -2,8 +2,8 @@ name: 🔁 SFTP Auto Backup (Every 6h)
 
 on:
   schedule:
-    - cron: '0 */6 * * *'  # 🕕 Every 6 hours (UTC)
-  workflow_dispatch:       # 🔘 Manual trigger via GitHub UI
+    - cron: '0 */6 * * *'  # Every 6 hours UTC
+  workflow_dispatch:
 
 jobs:
   sync-ftp:
@@ -21,37 +21,56 @@ jobs:
       - name: 🔍 Checkout Repository
         uses: actions/checkout@v4
 
-      - name: 🛠️ Install lftp
+      - name: 🛠️ Install Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y lftp
+          sudo apt-get install -y lftp zip
 
-      - name: 🧹 Clean & Prepare Backup Directory
+      - name: 🧹 Clean & Prepare
         run: |
-          rm -rf ftp-backup
-          mkdir -p ftp-backup
+          rm -rf ftp-backup release
+          mkdir -p ftp-backup release
 
-      - name: 🔄 Download from SFTP (🔓 Trust Disabled)
+      - name: 🔄 Sync from SFTP (host key check disabled)
         run: |
           lftp -u "$SFTP_USER","$SFTP_PASSWORD" -p "$SFTP_PORT" sftp://"$SFTP_HOST" -e \
           "set sftp:connect-program \"ssh -a -x -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null\"; mirror --verbose --delete --parallel=2 / ./ftp-backup; bye"
 
-      - name: ✅ Commit Changes if Any
+      - name: 🚀 Commit & Push to Repo (ignore README.md)
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
+          find ftp-backup -type f -name "README.md" -delete
           git add ftp-backup
           if ! git diff --quiet || ! git diff --staged --quiet; then
-            git commit -m "🗂️ Synced SFTP backup — $(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')"
+            DATE=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
+            git commit -m "📦 SFTP Auto-backup on $DATE"
             git pull --rebase || true
             git push || true
           fi
 
-      - name: 📦 Upload Backup Artifact
+      - name: 📦 Prepare Release Zip
+        run: |
+          cp -r ftp-backup/* release/
+          DATE=$(TZ=Asia/Tokyo date '+%Y-%m-%d_%H-%M-%S')
+          zip -r "sftp-backup-$DATE.zip" release
+          echo "TAG=v$DATE" >> $GITHUB_ENV
+          echo "ZIP_NAME=sftp-backup-$DATE.zip" >> $GITHUB_ENV
+
+      - name: 🚀 Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ env.TAG }}
+          name: "SFTP Backup ${{ env.TAG }}"
+          files: ${{ env.ZIP_NAME }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 💾 Upload Artifact (also for internal history)
         uses: actions/upload-artifact@v4
         with:
-          name: 🌐 SFTP Backup Archive
-          path: ftp-backup
+          name: sftp-backup-${{ env.TAG }}
+          path: release
 
       - name: 📣 Notify Discord (✅ Success)
         if: ${{ success() }}
@@ -60,7 +79,7 @@ jobs:
         run: |
           TIMESTAMP=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
           curl -H "Content-Type: application/json" -X POST -d \
-          "{\"username\": \"SFTP Bot 🤖\", \"content\": \"✅ **Backup Synced!**\n🕒 $TIMESTAMP (JST)\n📂 Files successfully downloaded & pushed.\"}" \
+          "{\"username\": \"SFTP Bot\", \"content\": \"✅ **Backup Complete**\n📅 $TIMESTAMP (JST)\n🗃️ Synced to repo + release + artifact uploaded.\"}" \
           "$DISCORD_WEBHOOK_URL"
 
       - name: 📣 Notify Discord (❌ Failure)
@@ -70,5 +89,5 @@ jobs:
         run: |
           TIMESTAMP=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
           curl -H "Content-Type: application/json" -X POST -d \
-          "{\"username\": \"SFTP Bot 🤖\", \"content\": \"❌ **Backup Failed!**\n🕒 $TIMESTAMP (JST)\n🔍 Check GitHub Actions logs for errors.\"}" \
+          "{\"username\": \"SFTP Bot\", \"content\": \"❌ **Backup Failed**\n📅 $TIMESTAMP (JST)\n⚠️ Check GitHub logs for details.\"}" \
           "$DISCORD_WEBHOOK_URL"
