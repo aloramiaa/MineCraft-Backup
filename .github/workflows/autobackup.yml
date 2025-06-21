@@ -2,8 +2,8 @@ name: SFTP Sync Every 6 Hours
 
 on:
   schedule:
-    - cron: '0 */6 * * *'  # Every 6 hours (UTC)
-  workflow_dispatch:       # ✅ Allows manual trigger
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
 
 jobs:
   sync-ftp:
@@ -15,7 +15,6 @@ jobs:
       SFTP_PORT: 2022
       SFTP_USER: allhc6ih.d0dc8ef6
       SFTP_PASSWORD: ${{ secrets.SFTP_PASSWORD }}
-      DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}  # Optional: use secret for safety
 
     steps:
       - name: Checkout Repository
@@ -56,6 +55,8 @@ EOF
 
       - name: Notify Discord (Success)
         if: success()
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
         run: |
           TIMESTAMP=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
           curl -H "Content-Type: application/json" -X POST \
@@ -64,6 +65,8 @@ EOF
 
       - name: Notify Discord (Failure)
         if: failure()
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
         run: |
           TIMESTAMP=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
           curl -H "Content-Type: application/json" -X POST \
