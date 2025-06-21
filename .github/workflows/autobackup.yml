@@ -1,12 +1,13 @@
-name: SFTP Sync Every 6 Hours
+name: 🔁 SFTP Auto Backup (Every 6h)
 
 on:
   schedule:
-    - cron: '0 */6 * * *' # Every 6 hours
-  workflow_dispatch:
+    - cron: '0 */6 * * *'  # 🕕 Every 6 hours (UTC)
+  workflow_dispatch:       # 🔘 Manual trigger via GitHub UI
 
 jobs:
   sync-ftp:
+    name: 📁 Sync FTP & Push
     runs-on: ubuntu-latest
 
     env:
@@ -17,52 +18,57 @@ jobs:
       SFTP_PASSWORD: ${{ secrets.SFTP_PASSWORD }}
 
     steps:
-      - name: Checkout Repository
+      - name: 🔍 Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Install lftp
+      - name: 🛠️ Install lftp
         run: |
           sudo apt-get update
           sudo apt-get install -y lftp
 
-      - name: Prepare Backup Directory
+      - name: 🧹 Clean & Prepare Backup Directory
         run: |
           rm -rf ftp-backup
           mkdir -p ftp-backup
 
-      - name: Download Files from SFTP
+      - name: 🔄 Download from SFTP (🔓 Trust Disabled)
         run: |
-          lftp -u "$SFTP_USER","$SFTP_PASSWORD" -p "$SFTP_PORT" sftp://"$SFTP_HOST" -e "mirror --verbose --delete --parallel=2 / ./ftp-backup; bye"
+          lftp -u "$SFTP_USER","$SFTP_PASSWORD" -p "$SFTP_PORT" sftp://"$SFTP_HOST" -e \
+          "set sftp:connect-program \"ssh -a -x -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null\"; mirror --verbose --delete --parallel=2 / ./ftp-backup; bye"
 
-      - name: Commit and Push Changes
+      - name: ✅ Commit Changes if Any
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
           git add ftp-backup
           if ! git diff --quiet || ! git diff --staged --quiet; then
-            git commit -m \"Sync FTP backup on $(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')\"
+            git commit -m "🗂️ Synced SFTP backup — $(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')"
             git pull --rebase || true
             git push || true
           fi
 
-      - name: Upload Backup as Artifact
+      - name: 📦 Upload Backup Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ftp-backup
+          name: 🌐 SFTP Backup Archive
           path: ftp-backup
 
-      - name: Notify Discord (Success)
+      - name: 📣 Notify Discord (✅ Success)
         if: ${{ success() }}
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
         run: |
           TIMESTAMP=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
-          curl -H "Content-Type: application/json" -X POST -d "{\"username\": \"SFTP Sync Bot\", \"content\": \"✅ FTP backup synced successfully at $TIMESTAMP (JST).\"}" "$DISCORD_WEBHOOK_URL"
+          curl -H "Content-Type: application/json" -X POST -d \
+          "{\"username\": \"SFTP Bot 🤖\", \"content\": \"✅ **Backup Synced!**\n🕒 $TIMESTAMP (JST)\n📂 Files successfully downloaded & pushed.\"}" \
+          "$DISCORD_WEBHOOK_URL"
 
-      - name: Notify Discord (Failure)
+      - name: 📣 Notify Discord (❌ Failure)
         if: ${{ failure() }}
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
         run: |
           TIMESTAMP=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
-          curl -H "Content-Type: application/json" -X POST -d "{\"username\": \"SFTP Sync Bot\", \"content\": \"❌ FTP sync **failed** at $TIMESTAMP (JST). Check GitHub Actions logs.\"}" "$DISCORD_WEBHOOK_URL"
+          curl -H "Content-Type: application/json" -X POST -d \
+          "{\"username\": \"SFTP Bot 🤖\", \"content\": \"❌ **Backup Failed!**\n🕒 $TIMESTAMP (JST)\n🔍 Check GitHub Actions logs for errors.\"}" \
+          "$DISCORD_WEBHOOK_URL"
