@@ -41,5 +41,5 @@ This repository automatically backs up files from my personal Minecraft server's
 
 ---
 
-## 🧪 Example Structure
+
 
