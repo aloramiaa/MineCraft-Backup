@@ -2,7 +2,7 @@ name: SFTP Sync Every 6 Hours
 
 on:
   schedule:
-    - cron: '0 */6 * * *' # Every 6 hours UTC
+    - cron: '0 */6 * * *' # Every 6 hours
   workflow_dispatch:
 
 jobs:
@@ -32,8 +32,7 @@ jobs:
 
       - name: Download Files from SFTP
         run: |
-          lftp -u "$SFTP_USER","$SFTP_PASSWORD" -p $SFTP_PORT sftp://$SFTP_HOST -e "mirror --verbose --delete --parallel=2 / ./ftp-backup; bye"
-
+          lftp -u "$SFTP_USER","$SFTP_PASSWORD" -p "$SFTP_PORT" sftp://"$SFTP_HOST" -e "mirror --verbose --delete --parallel=2 / ./ftp-backup; bye"
 
       - name: Commit and Push Changes
         run: |
@@ -41,7 +40,7 @@ jobs:
           git config user.email "github-actions@github.com"
           git add ftp-backup
           if ! git diff --quiet || ! git diff --staged --quiet; then
-            git commit -m "Sync FTP backup on $(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')"
+            git commit -m \"Sync FTP backup on $(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')\"
             git pull --rebase || true
             git push || true
           fi
@@ -58,9 +57,7 @@ jobs:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
         run: |
           TIMESTAMP=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
-          curl -H "Content-Type: application/json" -X POST -d \
-          "{\"username\": \"SFTP Sync Bot\", \"content\": \"✅ FTP backup synced successfully at $TIMESTAMP (JST).\"}" \
-          "$DISCORD_WEBHOOK_URL"
+          curl -H "Content-Type: application/json" -X POST -d "{\"username\": \"SFTP Sync Bot\", \"content\": \"✅ FTP backup synced successfully at $TIMESTAMP (JST).\"}" "$DISCORD_WEBHOOK_URL"
 
       - name: Notify Discord (Failure)
         if: ${{ failure() }}
@@ -68,6 +65,4 @@ jobs:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
         run: |
           TIMESTAMP=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
-          curl -H "Content-Type: application/json" -X POST -d \
-          "{\"username\": \"SFTP Sync Bot\", \"content\": \"❌ FTP sync **failed** at $TIMESTAMP (JST). Check GitHub Actions logs.\"}" \
-          "$DISCORD_WEBHOOK_URL"
+          curl -H "Content-Type: application/json" -X POST -d "{\"username\": \"SFTP Sync Bot\", \"content\": \"❌ FTP sync **failed** at $TIMESTAMP (JST). Check GitHub Actions logs.\"}" "$DISCORD_WEBHOOK_URL"
