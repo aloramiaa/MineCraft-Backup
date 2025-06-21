@@ -2,8 +2,8 @@ name: SFTP Sync Every 6 Hours
 
 on:
   schedule:
-    - cron: '0 */6 * * *'
-  workflow_dispatch:
+    - cron: '0 */6 * * *'  # Every 6 hours (UTC)
+  workflow_dispatch:       # ✅ Allows manual trigger
 
 jobs:
   sync-ftp:
@@ -15,7 +15,7 @@ jobs:
       SFTP_PORT: 2022
       SFTP_USER: allhc6ih.d0dc8ef6
       SFTP_PASSWORD: ${{ secrets.SFTP_PASSWORD }}
-      DISCORD_WEBHOOK_URL: https://ptb.discord.com/api/webhooks/1385932858564280541/Z76t5GiOveEToGhEgaC37KXzsEgOpjN8i_F_2U7rjr1vcfarMwjC4SAkG3qaqJeXkDQ8
+      DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}  # Optional: use secret for safety
 
     steps:
       - name: Checkout Repository
@@ -48,7 +48,7 @@ EOF
             git push || true
           )
 
-      - name: Upload backup as artifact
+      - name: Upload Backup as Artifact
         uses: actions/upload-artifact@v4
         with:
           name: ftp-backup
@@ -67,5 +67,5 @@ EOF
         run: |
           TIMESTAMP=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
           curl -H "Content-Type: application/json" -X POST \
-          -d "{\"username\": \"SFTP Sync Bot\", \"content\": \"❌ FTP sync **failed** at $TIMESTAMP (JST). Check Actions tab for logs.\"}" \
+          -d "{\"username\": \"SFTP Sync Bot\", \"content\": \"❌ FTP sync **failed** at $TIMESTAMP (JST). Check GitHub Actions logs.\"}" \
           "$DISCORD_WEBHOOK_URL"
