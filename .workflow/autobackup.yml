@@ -1,0 +1,71 @@
+name: SFTP Sync Every 6 Hours
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+
+jobs:
+  sync-ftp:
+    runs-on: ubuntu-latest
+
+    env:
+      TZ: Asia/Tokyo
+      SFTP_HOST: delta.optiklink.com
+      SFTP_PORT: 2022
+      SFTP_USER: allhc6ih.d0dc8ef6
+      SFTP_PASSWORD: ${{ secrets.SFTP_PASSWORD }}
+      DISCORD_WEBHOOK_URL: https://ptb.discord.com/api/webhooks/1385932858564280541/Z76t5GiOveEToGhEgaC37KXzsEgOpjN8i_F_2U7rjr1vcfarMwjC4SAkG3qaqJeXkDQ8
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install lftp
+        run: sudo apt-get update && sudo apt-get install -y lftp
+
+      - name: Prepare Backup Directory
+        run: |
+          rm -rf ftp-backup
+          mkdir -p ftp-backup
+
+      - name: Download Files from SFTP
+        run: |
+          set -e
+          lftp -u "$SFTP_USER","$SFTP_PASSWORD" -p $SFTP_PORT sftp://$SFTP_HOST <<EOF
+          mirror --verbose --delete --parallel=2 / ./ftp-backup
+          bye
+EOF
+
+      - name: Commit and Push Changes
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add ftp-backup
+          git diff --quiet && git diff --staged --quiet || (
+            git commit -m "Sync FTP backup on $(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')"
+            git pull --rebase || true
+            git push || true
+          )
+
+      - name: Upload backup as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ftp-backup
+          path: ftp-backup
+
+      - name: Notify Discord (Success)
+        if: success()
+        run: |
+          TIMESTAMP=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
+          curl -H "Content-Type: application/json" -X POST \
+          -d "{\"username\": \"SFTP Sync Bot\", \"content\": \"✅ FTP backup synced successfully at $TIMESTAMP (JST).\"}" \
+          "$DISCORD_WEBHOOK_URL"
+
+      - name: Notify Discord (Failure)
+        if: failure()
+        run: |
+          TIMESTAMP=$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')
+          curl -H "Content-Type: application/json" -X POST \
+          -d "{\"username\": \"SFTP Sync Bot\", \"content\": \"❌ FTP sync **failed** at $TIMESTAMP (JST). Check Actions tab for logs.\"}" \
+          "$DISCORD_WEBHOOK_URL"
