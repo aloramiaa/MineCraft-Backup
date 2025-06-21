@@ -32,12 +32,8 @@ jobs:
 
       - name: Download Files from SFTP
         run: |
-          bash -c '
-          lftp -u "$SFTP_USER","$SFTP_PASSWORD" -p $SFTP_PORT sftp://$SFTP_HOST <<EOF
-          mirror --verbose --delete --parallel=2 / ./ftp-backup
-          bye
-EOF
-          '
+          lftp -u "$SFTP_USER","$SFTP_PASSWORD" -p $SFTP_PORT sftp://$SFTP_HOST -e "mirror --verbose --delete --parallel=2 / ./ftp-backup; bye"
+
 
       - name: Commit and Push Changes
         run: |
