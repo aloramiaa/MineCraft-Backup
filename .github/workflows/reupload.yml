@@ -35,11 +35,11 @@ on:
       extract_zip:
         description: "🗂️ Extract ZIP before upload?"
         required: false
-        default: "yes"
+        default: "true"
         type: choice
         options:
-          - yes
-          - no
+          - "true"
+          - "false"
 
 jobs:
   sftp-action:
@@ -90,7 +90,7 @@ jobs:
           }
 
       - name: 🗂️ Extract ZIP (if required)
-        if: ${{ github.event.inputs.action == 'upload_via_zip' && github.event.inputs.extract_zip == 'yes' }}
+        if: ${{ github.event.inputs.action == 'upload_via_zip' && github.event.inputs.extract_zip == 'true' }}
         run: |
           echo "🗂️ Extracting ZIP..."
           unzip -o zip-temp/archive.zip -d zip-temp/extracted || {
@@ -107,10 +107,12 @@ jobs:
           PASS: ${{ github.event.inputs.password }}
           DEST: ${{ github.event.inputs.upload_path }}
         run: |
+          echo "::add-mask::$USER"
+          echo "::add-mask::$PASS"
           echo "📤 Uploading to $HOST:$PORT$DEST..."
           mkdir -p logs
-          
-          if [ "${{ github.event.inputs.extract_zip }}" = "yes" ]; then
+
+          if [ "${{ github.event.inputs.extract_zip }}" = "true" ]; then
             echo "📁 Uploading extracted contents..."
             lftp -u "$USER","$PASS" -p "$PORT" sftp://"$HOST" -e "
               set sftp:auto-confirm yes;
@@ -125,7 +127,7 @@ jobs:
               bye
             " | tee logs/upload.log
 
-      - name: 📄 Show Summary
+      - name: 📄 Show Uploaded Files Summary
         run: |
           echo "📄 Uploaded Files Summary:"
           grep "^Transferring file" logs/upload.log | sed 's/.*Transferring file //' || echo "⚠️ No files were transferred."
