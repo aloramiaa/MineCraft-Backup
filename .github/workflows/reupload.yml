@@ -12,10 +12,10 @@ on:
           - restore
           - upload_via_zip
       host:
-        description: "🌐 SFTP Host (e.g. sftp.example.com)"
+        description: "🌐 SFTP Host"
         required: true
       port:
-        description: "📦 SFTP Port (default: 22)"
+        description: "📦 SFTP Port"
         required: false
         default: "22"
       username:
@@ -26,7 +26,7 @@ on:
         required: true
         type: secret
       zip_url:
-        description: "🌐 ZIP URL (for 'upload_via_zip')"
+        description: "📥 Direct ZIP URL (required for 'upload_via_zip')"
         required: false
       upload_path:
         description: "📁 FTP Upload Path"
@@ -42,19 +42,19 @@ on:
           - "false"
 
 jobs:
-  sftp-action:
+  sftp_job:
     runs-on: ubuntu-latest
 
     steps:
-      - name: 📦 Checkout
+      - name: 📦 Checkout Repository
         uses: actions/checkout@v4
 
-      - name: 🧰 Install Tools
+      - name: 🛠 Install Required Tools
         run: |
           sudo apt-get update
           sudo apt-get install -y lftp unzip curl openssh-client
 
-      - name: 🧼 Mask Credentials
+      - name: 🔐 Mask Credentials
         run: |
           echo "::add-mask::${{ github.event.inputs.username }}"
           echo "::add-mask::${{ github.event.inputs.password }}"
@@ -67,32 +67,32 @@ jobs:
           USER: ${{ github.event.inputs.username }}
           PASS: ${{ github.event.inputs.password }}
         run: |
-          echo "📦 Restoring ftp-backup/ to $HOST:$PORT/..."
+          echo "📂 Restoring contents of ftp-backup/ to $HOST:$PORT/..."
           if [ ! -d ftp-backup ] || [ -z "$(ls -A ftp-backup)" ]; then
             echo "❌ 'ftp-backup' directory is missing or empty."
             exit 1
           fi
           mkdir -p logs
-          lftp -u "$USER","$PASS" -p "$PORT" sftp://"$HOST" -e "
-            set sftp:auto-confirm yes;
-            mirror --reverse --verbose ftp-backup /;
-            bye
-          " | tee logs/upload.log
+          lftp -u "$USER","$PASS" -p "$PORT" sftp://"$HOST" <<EOF | tee logs/upload.log
+set sftp:auto-confirm yes
+mirror --reverse --verbose ftp-backup /
+bye
+EOF
 
-      - name: 📥 Download ZIP (only if selected)
+      - name: 📥 Download ZIP File
         if: ${{ github.event.inputs.action == 'upload_via_zip' }}
         run: |
-          echo "📥 Downloading ZIP from: ${{ github.event.inputs.zip_url }}"
+          echo "🌐 Downloading ZIP from: ${{ github.event.inputs.zip_url }}"
           mkdir -p zip-temp
           curl -fsSL "${{ github.event.inputs.zip_url }}" -o zip-temp/archive.zip || {
-            echo "❌ Failed to download ZIP file."
+            echo "❌ Failed to download ZIP. Check URL or network."
             exit 1
           }
 
-      - name: 🗂️ Extract ZIP (if required)
+      - name: 🗂️ Extract ZIP Contents (if selected)
         if: ${{ github.event.inputs.action == 'upload_via_zip' && github.event.inputs.extract_zip == 'true' }}
         run: |
-          echo "🗂️ Extracting ZIP..."
+          echo "🗂️ Extracting ZIP contents..."
           unzip -o zip-temp/archive.zip -d zip-temp/extracted || {
             echo "❌ Failed to extract ZIP file."
             exit 1
@@ -113,21 +113,27 @@ jobs:
           mkdir -p logs
 
           if [ "${{ github.event.inputs.extract_zip }}" = "true" ]; then
-            echo "📁 Uploading extracted contents..."
-            lftp -u "$USER","$PASS" -p "$PORT" sftp://"$HOST" -e "
-              set sftp:auto-confirm yes;
-              mirror --reverse --verbose zip-temp/extracted \"$DEST\";
-              bye
-            " | tee logs/upload.log
+            echo "📁 Uploading extracted files..."
+            lftp -u "$USER","$PASS" -p "$PORT" sftp://"$HOST" <<EOF | tee logs/upload.log
+set sftp:auto-confirm yes
+mirror --reverse --verbose zip-temp/extracted "$DEST"
+bye
+EOF
           else
-            echo "📦 Uploading archive.zip directly..."
-            lftp -u "$USER","$PASS" -p "$PORT" sftp://"$HOST" -e "
-              set sftp:auto-confirm yes;
-              put -O \"$DEST\" zip-temp/archive.zip;
-              bye
-            " | tee logs/upload.log
+            echo "📦 Uploading ZIP archive directly..."
+            lftp -u "$USER","$PASS" -p "$PORT" sftp://"$HOST" <<EOF | tee logs/upload.log
+set sftp:auto-confirm yes
+put -O "$DEST" zip-temp/archive.zip
+bye
+EOF
 
-      - name: 📄 Show Uploaded Files Summary
+      - name: 📄 Summary of Uploaded Files
         run: |
-          echo "📄 Uploaded Files Summary:"
+          echo "📋 Upload Summary:"
           grep "^Transferring file" logs/upload.log | sed 's/.*Transferring file //' || echo "⚠️ No files were transferred."
+
+      - name: 🧹 Optional Cleanup (ZIP & temp files)
+        if: ${{ always() }}
+        run: |
+          echo "🧹 Cleaning up temporary files..."
+          rm -rf zip-temp logs
