@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       action:
-        description: "🛠️ What do you want to do?"
+        description: "🛠️ Choose Action"
         required: true
         default: "restore"
         type: choice
@@ -26,14 +26,14 @@ on:
         required: true
         type: secret
       zip_url:
-        description: "🌐 Direct ZIP File URL (only if 'upload_via_zip')"
+        description: "🌐 ZIP URL (for 'upload_via_zip')"
         required: false
       upload_path:
-        description: "📁 FTP Path to Upload (default: /)"
+        description: "📁 FTP Upload Path"
         required: false
         default: "/"
       extract_zip:
-        description: "🗂️ Extract ZIP before uploading?"
+        description: "🗂️ Extract ZIP before upload?"
         required: false
         default: "yes"
         type: choice
@@ -42,18 +42,22 @@ on:
           - no
 
 jobs:
-  handle-sftp:
+  sftp-action:
     runs-on: ubuntu-latest
-    name: 🔁 Handle SFTP Operation
 
     steps:
-      - name: 📦 Checkout Repository
+      - name: 📦 Checkout
         uses: actions/checkout@v4
 
-      - name: 🛠️ Install Required Tools
+      - name: 🧰 Install Tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y lftp unzip curl
+          sudo apt-get install -y lftp unzip curl openssh-client
+
+      - name: 🧼 Mask Credentials
+        run: |
+          echo "::add-mask::${{ github.event.inputs.username }}"
+          echo "::add-mask::${{ github.event.inputs.password }}"
 
       - name: 🔄 Restore from ftp-backup
         if: ${{ github.event.inputs.action == 'restore' }}
@@ -63,32 +67,36 @@ jobs:
           USER: ${{ github.event.inputs.username }}
           PASS: ${{ github.event.inputs.password }}
         run: |
-          echo "::add-mask::$USER"
-          echo "::add-mask::$PASS"
-          echo "📦 Restoring from ftp-backup/ to $HOST:$PORT/..."
-          if [ -z "$(ls -A ftp-backup 2>/dev/null)" ]; then
-            echo "❌ ftp-backup directory is empty or missing."
+          echo "📦 Restoring ftp-backup/ to $HOST:$PORT/..."
+          if [ ! -d ftp-backup ] || [ -z "$(ls -A ftp-backup)" ]; then
+            echo "❌ 'ftp-backup' directory is missing or empty."
             exit 1
           fi
           mkdir -p logs
           lftp -u "$USER","$PASS" -p "$PORT" sftp://"$HOST" -e "
-            set sftp:connect-program \"ssh -a -x -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null\";
+            set sftp:auto-confirm yes;
             mirror --reverse --verbose ftp-backup /;
             bye
           " | tee logs/upload.log
 
-      - name: 📥 Download ZIP File
+      - name: 📥 Download ZIP (only if selected)
         if: ${{ github.event.inputs.action == 'upload_via_zip' }}
         run: |
-          mkdir -p zip-temp
           echo "📥 Downloading ZIP from: ${{ github.event.inputs.zip_url }}"
-          curl -L "${{ github.event.inputs.zip_url }}" --output zip-temp/archive.zip
+          mkdir -p zip-temp
+          curl -fsSL "${{ github.event.inputs.zip_url }}" -o zip-temp/archive.zip || {
+            echo "❌ Failed to download ZIP file."
+            exit 1
+          }
 
       - name: 🗂️ Extract ZIP (if required)
         if: ${{ github.event.inputs.action == 'upload_via_zip' && github.event.inputs.extract_zip == 'yes' }}
         run: |
-          echo "🗂️ Extracting archive.zip..."
-          unzip -o zip-temp/archive.zip -d zip-temp/extracted
+          echo "🗂️ Extracting ZIP..."
+          unzip -o zip-temp/archive.zip -d zip-temp/extracted || {
+            echo "❌ Failed to extract ZIP file."
+            exit 1
+          }
 
       - name: 🚀 Upload to SFTP Server
         if: ${{ github.event.inputs.action == 'upload_via_zip' }}
@@ -98,30 +106,26 @@ jobs:
           USER: ${{ github.event.inputs.username }}
           PASS: ${{ github.event.inputs.password }}
           DEST: ${{ github.event.inputs.upload_path }}
-          EXTRACT: ${{ github.event.inputs.extract_zip }}
         run: |
-          echo "::add-mask::$USER"
-          echo "::add-mask::$PASS"
           echo "📤 Uploading to $HOST:$PORT$DEST..."
           mkdir -p logs
-
-          if [ "$EXTRACT" = "yes" ]; then
-            echo "📁 Uploading extracted ZIP contents..."
+          
+          if [ "${{ github.event.inputs.extract_zip }}" = "yes" ]; then
+            echo "📁 Uploading extracted contents..."
             lftp -u "$USER","$PASS" -p "$PORT" sftp://"$HOST" -e "
-              set sftp:connect-program \"ssh -a -x -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null\";
+              set sftp:auto-confirm yes;
               mirror --reverse --verbose zip-temp/extracted \"$DEST\";
               bye
             " | tee logs/upload.log
           else
-            echo "📦 Uploading ZIP file directly..."
+            echo "📦 Uploading archive.zip directly..."
             lftp -u "$USER","$PASS" -p "$PORT" sftp://"$HOST" -e "
-              set sftp:connect-program \"ssh -a -x -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null\";
+              set sftp:auto-confirm yes;
               put -O \"$DEST\" zip-temp/archive.zip;
               bye
             " | tee logs/upload.log
-          fi
 
-      - name: 📄 Show Uploaded Files Summary
+      - name: 📄 Show Summary
         run: |
-          echo "📄 Uploaded Files:"
+          echo "📄 Uploaded Files Summary:"
           grep "^Transferring file" logs/upload.log | sed 's/.*Transferring file //' || echo "⚠️ No files were transferred."
