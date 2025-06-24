@@ -1,6 +1,6 @@
-# 🗂️ MineCraft FTP Backup
+# 🗂️  FTP Backup
 
-This repository automatically backs up files from my personal Minecraft server's SFTP every **6 hours** using GitHub Actions.
+This repository automatically backs up files from my personal  server's SFTP every **6 hours** using GitHub Actions.
 
 > 🧪 **Personal Use Only**  
 > This backup system is maintained by [@aloramiaa](https://github.com/aloramiaa) for **private server maintenance and recovery**.  
@@ -10,7 +10,7 @@ This repository automatically backs up files from my personal Minecraft server's
 
 ## 📦 Latest Backup Download
 
-[![Latest Release](https://img.shields.io/github/v/release/aloramiaa/MineCraft-Backup?label=Latest%20Backup&style=for-the-badge&color=blue)](https://github.com/aloramiaa/MineCraft-Backup/releases/latest)
+[![Latest Release](https://img.shields.io/github/v/release/aloramiaa/-Backup?label=Latest%20Backup&style=for-the-badge&color=blue)](https://github.com/aloramiaa/-Backup/releases/latest)
 
 ---
 
@@ -18,7 +18,7 @@ This repository automatically backs up files from my personal Minecraft server's
 
 - 🔄 Automatically synced files from `sftp://delta.optiklink.com:2022`
 - 📁 All content stored in the `ftp-backup/` folder
-- 📦 `.zip` archives attached to every [GitHub Release](https://github.com/aloramiaa/MineCraft-Backup/releases)
+- 📦 `.zip` archives attached to every [GitHub Release](https://github.com/aloramiaa/-Backup/releases)
 
 ---
 
