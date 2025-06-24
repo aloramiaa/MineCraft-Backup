@@ -15,9 +15,9 @@ jobs:
 
     env:
       TZ: Asia/Tokyo
-      SFTP_HOST: delta.optiklink.com
+      SFTP_HOST: positron.optiklink.com
       SFTP_PORT: 2022
-      SFTP_USER: allhc6ih.d0dc8ef6
+      SFTP_USER: allhc6ih.adadb0dd
       SFTP_PASSWORD: ${{ secrets.SFTP_PASSWORD }}
 
     steps:
