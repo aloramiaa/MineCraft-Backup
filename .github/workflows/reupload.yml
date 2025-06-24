@@ -71,9 +71,11 @@ jobs:
             exit 1
           fi
           mkdir -p logs
-          lftp -u "$USER","$PASS" -p "$PORT" sftp://"$HOST" -e \
-            "set sftp:connect-program \"ssh -a -x -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null\"; mirror --reverse --verbose ftp-backup /; bye" \
-            | tee logs/upload.log
+          lftp -u "$USER","$PASS" -p "$PORT" sftp://"$HOST" -e "
+            set sftp:connect-program \"ssh -a -x -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null\";
+            mirror --reverse --verbose ftp-backup /;
+            bye
+          " | tee logs/upload.log
 
       - name: 📥 Download ZIP File
         if: ${{ github.event.inputs.action == 'upload_via_zip' }}
@@ -96,22 +98,28 @@ jobs:
           USER: ${{ github.event.inputs.username }}
           PASS: ${{ github.event.inputs.password }}
           DEST: ${{ github.event.inputs.upload_path }}
+          EXTRACT: ${{ github.event.inputs.extract_zip }}
         run: |
           echo "::add-mask::$USER"
           echo "::add-mask::$PASS"
           echo "📤 Uploading to $HOST:$PORT$DEST..."
           mkdir -p logs
 
-          if [ "${{ github.event.inputs.extract_zip }}" == "yes" ]; then
+          if [ "$EXTRACT" = "yes" ]; then
             echo "📁 Uploading extracted ZIP contents..."
-            lftp -u "$USER","$PASS" -p "$PORT" sftp://"$HOST" -e \
-              "set sftp:connect-program \"ssh -a -x -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null\"; mirror --reverse --verbose zip-temp/extracted \"$DEST\"; bye" \
-              | tee logs/upload.log
+            lftp -u "$USER","$PASS" -p "$PORT" sftp://"$HOST" -e "
+              set sftp:connect-program \"ssh -a -x -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null\";
+              mirror --reverse --verbose zip-temp/extracted \"$DEST\";
+              bye
+            " | tee logs/upload.log
           else
             echo "📦 Uploading ZIP file directly..."
-            lftp -u "$USER","$PASS" -p "$PORT" sftp://"$HOST" -e \
-              "set sftp:connect-program \"ssh -a -x -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null\"; put -O \"$DEST\" zip-temp/archive.zip; bye" \
-              | tee logs/upload.log
+            lftp -u "$USER","$PASS" -p "$PORT" sftp://"$HOST" -e "
+              set sftp:connect-program \"ssh -a -x -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null\";
+              put -O \"$DEST\" zip-temp/archive.zip;
+              bye
+            " | tee logs/upload.log
+          fi
 
       - name: 📄 Show Uploaded Files Summary
         run: |
