@@ -5,6 +5,9 @@ on:
     - cron: '0 */6 * * *'  # Every 6 hours UTC
   workflow_dispatch:
 
+permissions:
+  contents: write  # ✅ Required to create releases
+
 jobs:
   sync-ftp:
     name: 📁 Sync FTP & Push
