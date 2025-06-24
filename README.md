@@ -10,13 +10,13 @@ This repository automatically backs up files from my personal  server's SFTP eve
 
 ## 📦 Latest Backup Download
 
-[![Latest Release](https://img.shields.io/github/v/release/aloramiaa/-Backup?label=Latest%20Backup&style=for-the-badge&color=blue)](https://github.com/aloramiaa/-Backup/releases/latest)
+[![Latest Release](https://img.shields.io/github/v/release/aloramiaa/SFTP-DataBackup?label=Latest%20Backup&style=for-the-badge&color=blue)](https://github.com/aloramiaa/-Backup/releases/latest)
 
 ---
 
 ## 🔁 What This Repo Contains
 
-- 🔄 Automatically synced files from `sftp://delta.optiklink.com:2022`
+- 🔄 Automatically synced files from `sftp://positron.optiklink.com:2022`
 - 📁 All content stored in the `ftp-backup/` folder
 - 📦 `.zip` archives attached to every [GitHub Release](https://github.com/aloramiaa/-Backup/releases)
 
